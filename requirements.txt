@@ -1,0 +1,5 @@
+pymatgen>=2026.3.23
+numpy>=2.0.0
+scipy>=1.17.0
+matplotlib>=3.9.0
+pandas>=2.2.0
