@@ -1,56 +1,40 @@
+"""Input/output functions for CIF and BRML files."""
+
+import zipfile
+import xml.etree.ElementTree as ET
 import numpy as np
-import pandas as pd
-from io import StringIO
 from pymatgen.io.cif import CifParser
 
 
-def read_two_column_text(filename):
+def get_brml_wavelength(filename):
     """
-    Read a simple two-column text file with 2θ and intensity.
+    Extract X-ray wavelength information from a BRML file.
 
     Args:
-        filename: Path to text file
+        filename: Path to .brml file
 
     Returns:
-        tuple: (two_theta, intensity) as numpy arrays
+        dict: Dictionary with tube material and wavelength info
+              e.g., {'tube_material': 'Cu', 'wavelength_known': True}
     """
-    data = np.loadtxt(filename)
-    if data.ndim == 1:
-        raise ValueError("File must have at least two columns")
-    return data[:, 0], data[:, 1]
-
-
-def read_bruker_xrd(filename):
-    """
-    Read Bruker .txt XRD file with [Data] section.
-
-    The file format typically has:
-    - Header lines with metadata
-    - A [Data] marker
-    - CSV data: "Angle","Intensity"
-
-    Args:
-        filename: Path to Bruker .txt file
-
-    Returns:
-        tuple: (two_theta, intensity) as numpy arrays
-    """
-    with open(filename, 'r') as f:
-        lines = f.readlines()
-
-    data_start = None
-    for i, line in enumerate(lines):
-        if '[Data]' in line:
-            data_start = i + 2
-            break
-
-    if data_start is None:
-        raise ValueError(f"Could not find [Data] section in {filename}")
-
-    data_str = ''.join(lines[data_start:])
-    df = pd.read_csv(StringIO(data_str), header=None, names=['Angle', 'Intensity'])
-
-    return df['Angle'].values, df['Intensity'].values
+    with zipfile.ZipFile(filename, 'r') as zf:
+        for name in zf.namelist():
+            if 'InstructionContainer' in name or 'MeasurementContainer' in name:
+                with zf.open(name) as f:
+                    content = f.read().decode('utf-8')
+                    if 'TubeMaterial Value="' in content:
+                        idx = content.find('TubeMaterial Value="')
+                        if idx >= 0:
+                            end_idx = content.find('"', idx + len('TubeMaterial Value="'))
+                            material = content[idx + len('TubeMaterial Value="'):end_idx]
+                            return {
+                                'tube_material': material,
+                                'common_wavelengths': {
+                                    'Cu': {'Ka1': 1.54056, 'Ka2': 1.54439, 'Ka_avg': 1.54184},
+                                    'Mo': {'Ka1': 0.70930, 'Ka2': 0.71359, 'Ka_avg': 0.71073},
+                                }[material] if material in ['Cu', 'Mo'] else None
+                            }
+    return {'tube_material': 'unknown'}
 
 
 def read_cif(filename, primitive=False):
@@ -65,7 +49,7 @@ def read_cif(filename, primitive=False):
         pymatgen.core.structure.Structure
     """
     parser = CifParser(filename)
-    structures = parser.get_structures(primitive=primitive)
+    structures = parser.parse_structures(primitive=primitive)
 
     if parser.warnings:
         for warning in parser.warnings:
@@ -74,22 +58,39 @@ def read_cif(filename, primitive=False):
     return structures[0]
 
 
-def auto_read_xrd(filename):
+def read_brml(filename):
     """
-    Automatically detect and read XRD data file format.
+    Read a Bruker BRML file and extract XRD pattern data.
 
-    Tries Bruker format first, then falls back to two-column text.
+    BRML files are zip archives containing XML measurement data in RawDataN.xml files.
+    Data is stored in <Datum> elements as CSV: time, ?, two_theta, theta, intensity
 
     Args:
-        filename: Path to XRD data file
+        filename: Path to .brml file
 
     Returns:
         tuple: (two_theta, intensity) as numpy arrays
     """
-    try:
-        return read_bruker_xrd(filename)
-    except (ValueError, Exception):
-        try:
-            return read_two_column_text(filename)
-        except Exception as e:
-            raise ValueError(f"Could not read {filename} as either Bruker or two-column format: {e}")
+    with zipfile.ZipFile(filename, 'r') as zf:
+        raw_data_files = [name for name in zf.namelist() if 'RawData' in name and name.endswith('.xml')]
+
+        for xml_file in raw_data_files:
+            with zf.open(xml_file) as f:
+                tree = ET.parse(f)
+                root = tree.getroot()
+
+                two_theta_values = []
+                intensity_values = []
+
+                for datum in root.iter('Datum'):
+                    parts = datum.text.split(',')
+                    if len(parts) >= 5:
+                        two_theta = float(parts[2])
+                        intensity = float(parts[4])
+                        two_theta_values.append(two_theta)
+                        intensity_values.append(intensity)
+
+                if two_theta_values and intensity_values:
+                    return np.array(two_theta_values), np.array(intensity_values)
+
+    raise ValueError(f"Could not extract XRD data from {filename}")

@@ -1,152 +1,78 @@
 # Powder XRD Analyzer
 
-A Python tool for analyzing Powder XRD data from single crystal slab samples.
-Calculates theoretical powder patterns from CIF files, identifies experimental peaks,
-determines Miller indices (hkl), and estimates crystal orientation.
+A minimal Python tool for:
+1. **Reading CIF files and calculating theoretical powder XRD patterns** (VESTA-style)
+2. **Reading Bruker BRML files and plotting experimental XRD data**
 
 ## Features
 
-- **Read CIF files**: Load crystal structures using pymatgen
-- **Calculate powder patterns**: Compute theoretical XRD patterns with configurable wavelength
-- **Peak detection**: Advanced peak finding with background subtraction (SNIP algorithm)
-- **Peak indexing**: Match experimental peaks with theoretical to determine hkl indices
-- **Orientation analysis**: Determine single crystal slab orientation by pattern matching
-- **Visualization**: Plot experimental vs calculated patterns with hkl labels
-- **Support for Bruker .txt format**: Auto-detects common XRD data formats
+- **CIF processing**: Read crystal structures using pymatgen
+- **Pattern calculation**: Compute theoretical powder XRD patterns with configurable wavelength
+- **hkl labeling**: Display Miller indices on calculated pattern plots
+- **BRML support**: Read Bruker .brml (XML-based) measurement files
+- **Visualization**: Plot experimental patterns from BRML files
 
 ## Installation
-
-```bash
-pip install -r requirements.txt
-```
-
-Or using uv:
 
 ```bash
 uv sync
 ```
 
-## Interactive Jupyter Notebook
-
-An interactive Jupyter notebook is available at `examples/workflow.ipynb`:
-
-```bash
-cd examples
-jupyter notebook workflow.ipynb
-# or
-jupyter lab
-```
-
-The notebook includes:
-- Step-by-step interactive workflow
-- Visualization at each step
-- Simulated data demo if no real data is available
-- Parameter tuning guidance
-
 ## Quick Start
 
-### Command Line
-
-```bash
-# 1. Calculate powder pattern from CIF
-python scripts/calculate_pattern.py --cif your_structure.cif
-
-# 2. Find peaks in experimental data
-python scripts/find_peaks.py --data your_xrd_data.txt --output peaks.png
-
-# 3. Index peaks (match experimental with calculated pattern)
-python scripts/index_peaks.py --cif your_structure.cif --data your_xrd_data.txt --output comparison.png
-
-# 4. Analyze slab orientation
-python scripts/analyze_orientation.py --cif your_structure.cif --data your_xrd_data.txt
-```
-
-### Python API
+### Calculate Pattern from CIF
 
 ```python
-import sys
-sys.path.insert(0, '.')
+from powder_xrd_analyzer import read_cif, calculate_powder_pattern, print_pattern_summary, plot_pattern_with_hkl
 
-from powder_xrd_analyzer import (
-    read_cif, auto_read_xrd,
-    calculate_powder_pattern,
-    preprocess_xrd_data, find_xrd_peaks,
-    match_peaks, print_indexed_peaks,
-    analyze_slab_orientation, print_orientation_results,
-    plot_comparison
-)
+# Read CIF and calculate pattern
+structure = read_cif("cif_files/your_structure.cif")
+pattern = calculate_powder_pattern(structure, wavelength="CuKa", two_theta_range=(5, 90))
 
-# Read data
-structure = read_cif("your_structure.cif")
-tt, intensity = auto_read_xrd("your_xrd_data.txt")
+# Print summary of peaks
+print_pattern_summary(pattern, n_peaks=20)
 
-# Find peaks
-processed = preprocess_xrd_data(tt, intensity)
-peak_tt, peak_int, _ = find_xrd_peaks(tt, processed)
-
-# Calculate pattern and index peaks
-pattern = calculate_powder_pattern(structure)
-matches = match_peaks(peak_tt, pattern, tolerance=0.1)
-print_indexed_peaks(matches)
-
-# Analyze orientation
-results = analyze_slab_orientation(structure, peak_tt, max_index=3)
-print_orientation_results(results)
-
-# Visualize
-plot_comparison(tt, processed, pattern, matches)
+# Plot pattern with hkl labels
+fig = plot_pattern_with_hkl(pattern)
+fig.savefig("calculated_pattern.png", dpi=150)
 ```
 
-## Modules
+### Plot BRML Data
 
-| Module | Purpose |
-|--------|---------|
-| `io.py` | Read CIF files and XRD data (Bruker .txt or two-column) |
-| `pattern_calculator.py` | Calculate theoretical powder XRD patterns |
-| `peak_finding.py` | Background subtraction and peak detection |
-| `peak_matching.py` | Match peaks and determine Miller indices |
-| `orientation.py` | Single crystal slab orientation analysis |
-| `visualization.py` | Plotting utilities for comparison |
+```python
+from powder_xrd_analyzer import read_brml, plot_brml
 
-## Parameters
+# Read BRML file
+two_theta, intensity = read_brml("data/your_measurement.brml")
 
-### Peak Finding
-- `height_pct`: Minimum peak height as percentage of maximum intensity
-- `prominence`: Peak prominence for noise rejection (higher = fewer peaks)
-- `min_distance`: Minimum peak separation (data points)
-
-### Peak Matching
-- `tolerance`: Maximum 2θ difference for peak matching (degrees, default: 0.1)
-
-### Orientation Analysis
-- `max_index`: Maximum Miller index to consider (default: 3 = up to (333))
-- `tolerance`: Peak matching tolerance for orientation scoring (default: 0.15)
-
-## Example Data Format
-
-### Bruker .txt Files
-```
-[Data]
-"Angle","Intensity"
-5.001,1234.5
-5.021,1256.7
-...
+# Plot pattern
+fig = plot_brml(two_theta, intensity, title="Your XRD Data")
+fig.savefig("brml_plot.png", dpi=150)
 ```
 
-### Two-column Text Files
-```
-5.001 1234.5
-5.021 1256.7
-...
-```
+## API Reference
 
-## Dependencies
+### `read_cif(filename, primitive=False)`
+Read a CIF file and return a pymatgen Structure object.
 
-- `pymatgen`: Core crystallographic calculations
-- `numpy/scipy`: Numerical operations and peak finding
-- `matplotlib`: Visualization
-- `pandas`: Data handling
+### `calculate_powder_pattern(structure, wavelength="CuKa", two_theta_range=(5, 90), scaled=True, symprec=0.1)`
+Calculate theoretical powder XRD pattern. Returns a DiffractionPattern object with:
+- `.x`: numpy array of 2θ angles (degrees)
+- `.y`: numpy array of relative intensities
+- `.hkls`: hkl indices information
+- `.d_hkls`: d-spacings in angstroms
 
-## License
+### `print_pattern_summary(pattern, n_peaks=None)`
+Print a formatted summary of calculated peaks.
 
-MIT
+### `read_brml(filename)`
+Read a Bruker BRML file. Returns `(two_theta, intensity)` as numpy arrays.
+
+### `plot_brml(two_theta, intensity, figsize=(12, 5), title="XRD Pattern", **kwargs)`
+Plot experimental XRD pattern.
+
+### `plot_pattern(pattern, figsize=(12, 5), title="Calculated XRD Pattern", color="red", linewidth=2)`
+Plot calculated pattern as vertical lines.
+
+### `plot_pattern_with_hkl(pattern, figsize=(14, 6), title="Calculated XRD Pattern", color="red", linewidth=2, label_intensity_threshold=5)`
+Plot calculated pattern with hkl indices labeled above peaks.
