@@ -13,3 +13,6 @@ wheels/
 .DS_Store
 
 cifs/
+
+.codex
+CODEX.md
