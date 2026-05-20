@@ -2,6 +2,6 @@
 
 from .io import read_cif, read_brml, get_brml_wavelength
 from .pattern_calculator import calculate_powder_pattern, print_pattern_summary
-from .visualization import plot_brml, plot_pattern, plot_pattern_with_hkl, plot_selected_hkl
+from .visualization import plot_brml, plot_pattern, plot_pattern_with_hkl, plot_selected_hkl, plot_multiple_brml
 
 __version__ = "0.1.0"
