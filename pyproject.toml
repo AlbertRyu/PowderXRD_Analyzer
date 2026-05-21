@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "powderxrd-analyzer"
 version = "0.1.0"
@@ -5,10 +9,21 @@ description = "Powder XRD analysis tool for single crystal slab orientation dete
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "fastapi>=0.115.0",
     "matplotlib>=3.10.9",
     "notebook>=7.5.6",
     "numpy>=2.4.4",
     "pandas>=2.2.0",
     "pymatgen>=2026.3.23",
     "scipy>=1.17.1",
+    "uvicorn>=0.35.0",
 ]
+
+[project.scripts]
+powderxrd-webapp = "powder_xrd_analyzer.webapp:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

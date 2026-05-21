@@ -11,6 +11,7 @@ A minimal Python tool for:
 - **hkl labeling**: Display Miller indices on calculated pattern plots
 - **BRML support**: Read Bruker .brml (XML-based) measurement files
 - **Visualization**: Plot experimental patterns from BRML files
+- **Web application**: Browse `.brml` files and plot them through a FastAPI + uvicorn SPA
 
 ## Installation
 
@@ -19,6 +20,29 @@ uv sync
 ```
 
 ## Quick Start
+
+### Start the Web App
+
+```bash
+uv sync
+uv run powderxrd-webapp --host 127.0.0.1 --port 8000
+```
+
+Then open `http://127.0.0.1:8000`.
+
+The web app provides a single workspace view:
+- **Left panel**: recursively scans the current directory and lists all `.brml` files
+- **Right panel**: renders the selected `.brml` files in the same plot for direct comparison
+- **Multi-select**: click multiple files to overlay several XRD curves at once
+- **Experiment metadata**: if `experiment_record.csv` exists in the scanned root, file cards show `exp-id`, `sample`, and `comment`
+- **Sample filter**: narrow the file list by sample name from `experiment_record.csv`
+- **CIF overlay**: read `.cif` files from `cifs/`, calculate powder patterns, and overlay requested `hkl` peaks on the experimental plot
+
+To scan a different directory:
+
+```bash
+uv run powderxrd-webapp --root /path/to/data --host 0.0.0.0 --port 8000
+```
 
 ### Calculate Pattern from CIF
 
